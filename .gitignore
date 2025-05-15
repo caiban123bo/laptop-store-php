@@ -1,0 +1,15 @@
+Ignore temporary files and caches
+
+*.log *.cache .DS_Store Thumbs.db
+
+Ignore vendor dependencies (if using Composer)
+
+vendor/
+
+Ignore IDE or editor configs
+
+.vscode/ .idea/
+
+Ignore database dumps (if any)
+
+*.sql
