@@ -1,5 +1,4 @@
 <?php
-session_start();
 
 $order = [
     'order_id' => '20250210754330677AE8BC4TC',

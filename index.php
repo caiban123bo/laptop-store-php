@@ -2,6 +2,50 @@
 include 'header.php';
 include 'assets/db.php';
 
+// Hiển thị thông báo nếu có
+$success_message = '';
+if (isset($_SESSION['order_success'])) {
+    $success_message = $_SESSION['order_success'];
+    unset($_SESSION['order_success']); // Xóa thông báo sau khi hiển thị
+}
+if ($success_message): ?>
+    <div class="success-message"><?php echo htmlspecialchars($success_message); ?></div>
+<?php endif; ?>
+<script>
+    setTimeout(() => {
+        const messages = document.querySelectorAll('.success-message, .error-message');
+        messages.forEach(msg => msg.style.opacity = '0');
+    }, 5000); // Ẩn thông báo sau 5 giây
+
+    // Hàm thêm sản phẩm vào giỏ hàng
+    function addToCart(maLaptop) {
+        fetch('add_to_cart.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'maLaptop=' + encodeURIComponent(maLaptop)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Thêm vào giỏ hàng thành công!');
+                // Cập nhật số lượng giỏ hàng (nếu có hiển thị)
+            } else {
+                alert('Lỗi: ' + (data.message || 'Không thể thêm vào giỏ hàng'));
+            }
+        })
+        .catch(error => {
+            alert('Lỗi kết nối: ' + error.message);
+        });
+    }
+
+    // Hàm thêm vào danh sách yêu thích (chưa hoàn thiện, cần logic backend)
+    function addToFavorite(maLaptop) {
+        alert('Chức năng yêu thích chưa được triển khai. MaLaptop: ' + maLaptop);
+    }
+</script>
+<?php
 // Initialize query components
 $where_clauses = ["l.TrangThai = 'ConHang'"];
 $params = [];
@@ -108,11 +152,12 @@ if (isset($_GET['os']) && !empty($_GET['os'])) {
 // Build and execute query
 $where = !empty($where_clauses) ? 'WHERE ' . implode(' AND ', $where_clauses) : '';
 $query = "
-    SELECT l.TenLaptop, l.GiaBan, l.SoLuong, h.TenHang, h.HinhAnh, d.TenDanhMuc
+    SELECT l.MaLaptop, l.TenLaptop, l.GiaBan, l.SoLuong, h.TenHang, d.TenDanhMuc, ha.DuongDan AS HinhAnh
     FROM Laptop l
     JOIN Hang h ON l.MaHang = h.MaHang
     JOIN DanhMuc d ON l.MaDanhMuc = d.MaDanhMuc
     JOIN ThongSoKyThuat t ON l.MaThongSo = t.MaThongSo
+    LEFT JOIN HinhAnh ha ON l.MaLaptop = ha.MaLaptop AND ha.MacDinh = TRUE
     $where
     ORDER BY l.NgayCapNhat DESC
 ";
@@ -130,7 +175,8 @@ $stmt->execute();
 $laptops = $stmt->get_result();
 
 // Function to format price in VND
-function formatPrice($price) {
+function formatPrice($price)
+{
     return number_format($price, 0, ',', '.') . 'đ';
 }
 ?>
@@ -144,12 +190,14 @@ function formatPrice($price) {
         <?php else: ?>
             <?php while ($laptop = $laptops->fetch_assoc()): ?>
                 <div class="product-card">
-                    <img src="<?php echo htmlspecialchars($laptop['HinhAnh']); ?>" alt="<?php echo htmlspecialchars($laptop['TenHang'] . ' ' . $laptop['TenLaptop']); ?>">
+                    <img src="<?php echo htmlspecialchars($laptop['HinhAnh'] ?: 'assets/images/default.png'); ?>"
+                        alt="<?php echo htmlspecialchars($laptop['TenHang'] . ' ' . $laptop['TenLaptop']); ?>">
                     <h4><?php echo htmlspecialchars($laptop['TenHang'] . ' ' . $laptop['TenLaptop']); ?></h4>
                     <p class="price"><?php echo formatPrice($laptop['GiaBan']); ?></p>
                     <div class="actions">
-                        <button class="add-to-cart">Giỏ hàng</button>
-                        <button class="favorite">Yêu thích</button>
+                        <button class="add-to-cart" onclick="addToCart(<?php echo $laptop['MaLaptop']; ?>)">Thêm vào giỏ hàng</button>
+                        <a href="product_detail.php?id=<?php echo $laptop['MaLaptop']; ?>" class="view-detail">Xem chi tiết</a>
+                        <button class="favorite" onclick="addToFavorite(<?php echo $laptop['MaLaptop']; ?>)">Yêu thích</button>
                     </div>
                 </div>
             <?php endwhile; ?>
