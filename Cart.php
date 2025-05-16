@@ -5,6 +5,12 @@ include 'assets/db.php';
 // Kiểm tra đăng nhập
 $maNguoiDung = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 
+if (!$maNguoiDung) {
+    echo '<div class="error-message">Vui lòng đăng nhập để xem giỏ hàng!</div>';
+    include 'footer.php';
+    exit;
+}
+
 // Hàm định dạng giá
 function formatPrice($price) {
     return number_format($price, 0, ',', '.') . 'đ';
@@ -21,65 +27,56 @@ while ($row = $result_km->fetch_assoc()) {
     $khuyenMai[$row['MaKhuyenMai']] = $row;
 }
 
-// Đồng bộ giỏ hàng session với bảng GioHang
-if ($maNguoiDung && !empty($_SESSION['cart'])) {
-    $stmt = $conn->prepare("DELETE FROM GioHang WHERE MaNguoiDung = ?");
-    $stmt->bind_param('i', $maNguoiDung);
-    $stmt->execute();
-    $stmt->close();
-
-    $stmt = $conn->prepare("INSERT INTO GioHang (MaNguoiDung, MaLaptop, SoLuong) VALUES (?, ?, ?)");
-    foreach ($_SESSION['cart'] as $maLaptop => $item) {
-        $stmt->bind_param('iii', $maNguoiDung, $maLaptop, $item['quantity']);
-        $stmt->execute();
-    }
-    $stmt->close();
-} elseif ($maNguoiDung && empty($_SESSION['cart'])) {
-    $stmt = $conn->prepare("
-        SELECT g.MaLaptop, g.SoLuong, l.TenLaptop, l.GiaBan, h.TenHang, ha.DuongDan AS HinhAnh
-        FROM GioHang g
-        JOIN Laptop l ON g.MaLaptop = l.MaLaptop
-        JOIN Hang h ON l.MaHang = h.MaHang
-        LEFT JOIN HinhAnh ha ON l.MaLaptop = ha.MaLaptop AND ha.MacDinh = TRUE
-        WHERE g.MaNguoiDung = ?
-    ");
-    $stmt->bind_param('i', $maNguoiDung);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $_SESSION['cart'] = [];
-    while ($row = $result->fetch_assoc()) {
-        $_SESSION['cart'][$row['MaLaptop']] = [
-            'name' => $row['TenHang'] . ' ' . $row['TenLaptop'],
-            'price' => $row['GiaBan'],
-            'quantity' => $row['SoLuong'],
-            'image' => $row['HinhAnh'] ?: 'assets/images/default.png'
-        ];
-    }
-    $stmt->close();
+// Lấy giỏ hàng từ cơ sở dữ liệu
+$cart_items = [];
+$query_cart = "
+    SELECT g.MaLaptop, g.SoLuong, l.TenLaptop, l.GiaBan, l.SoLuong AS TonKho, h.TenHang, ha.DuongDan AS HinhAnh
+    FROM GioHang g
+    JOIN Laptop l ON g.MaLaptop = l.MaLaptop
+    JOIN Hang h ON l.MaHang = h.MaHang
+    LEFT JOIN HinhAnh ha ON l.MaLaptop = ha.MaLaptop AND ha.MacDinh = TRUE
+    WHERE g.MaNguoiDung = ?
+";
+$stmt = $conn->prepare($query_cart);
+$stmt->bind_param('i', $maNguoiDung);
+$stmt->execute();
+$result = $stmt->get_result();
+while ($row = $result->fetch_assoc()) {
+    $cart_items[$row['MaLaptop']] = [
+        'name' => $row['TenHang'] . ' ' . $row['TenLaptop'],
+        'price' => $row['GiaBan'],
+        'quantity' => $row['SoLuong'],
+        'stock' => $row['TonKho'],
+        'image' => $row['HinhAnh'] ?: 'assets/images/default.png'
+    ];
 }
+$stmt->close();
 
 // Xử lý cập nhật giỏ hàng
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_cart'])) {
     foreach ($_POST['quantity'] as $maLaptop => $quantity) {
         $quantity = max(1, intval($quantity));
+        $maLaptop = intval($maLaptop);
+
+        // Kiểm tra số lượng tồn kho
         $query = "SELECT SoLuong FROM Laptop WHERE MaLaptop = ? AND TrangThai = 'ConHang'";
         $stmt = $conn->prepare($query);
         $stmt->bind_param('i', $maLaptop);
         $stmt->execute();
         $result = $stmt->get_result();
         $laptop = $result->fetch_assoc();
-        
+        $stmt->close();
+
         if ($laptop && $quantity <= $laptop['SoLuong']) {
-            $_SESSION['cart'][$maLaptop]['quantity'] = $quantity;
-            if ($maNguoiDung) {
-                $stmt = $conn->prepare("UPDATE GioHang SET SoLuong = ? WHERE MaNguoiDung = ? AND MaLaptop = ?");
-                $stmt->bind_param('iii', $quantity, $maNguoiDung, $maLaptop);
-                $stmt->execute();
-                $stmt->close();
-            }
+            $stmt = $conn->prepare("UPDATE GioHang SET SoLuong = ? WHERE MaNguoiDung = ? AND MaLaptop = ?");
+            $stmt->bind_param('iii', $quantity, $maNguoiDung, $maLaptop);
+            $stmt->execute();
+            $stmt->close();
             echo '<div class="success-message">Đã cập nhật giỏ hàng!</div>';
+            // Cập nhật lại dữ liệu hiển thị
+            $cart_items[$maLaptop]['quantity'] = $quantity;
         } else {
-            echo '<div class="error-message">Số lượng cho sản phẩm ' . htmlspecialchars($_SESSION['cart'][$maLaptop]['name']) . ' không hợp lệ!</div>';
+            echo '<div class="error-message">Số lượng cho sản phẩm ' . htmlspecialchars($cart_items[$maLaptop]['name']) . ' không hợp lệ!</div>';
         }
     }
 }
@@ -87,26 +84,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_cart'])) {
 // Xử lý xóa sản phẩm
 if (isset($_GET['remove'])) {
     $maLaptop = intval($_GET['remove']);
-    if (isset($_SESSION['cart'][$maLaptop])) {
-        unset($_SESSION['cart'][$maLaptop]);
-        if ($maNguoiDung) {
-            $stmt = $conn->prepare("DELETE FROM GioHang WHERE MaNguoiDung = ? AND MaLaptop = ?");
-            $stmt->bind_param('ii', $maNguoiDung, $maLaptop);
-            $stmt->execute();
-            $stmt->close();
-        }
+    if (isset($cart_items[$maLaptop])) {
+        $stmt = $conn->prepare("DELETE FROM GioHang WHERE MaNguoiDung = ? AND MaLaptop = ?");
+        $stmt->bind_param('ii', $maNguoiDung, $maLaptop);
+        $stmt->execute();
+        $stmt->close();
+        unset($cart_items[$maLaptop]);
         echo '<div class="success-message">Đã xóa sản phẩm khỏi giỏ hàng!</div>';
     }
 }
 
 // Kiểm tra giỏ hàng rỗng
-$cart_empty = empty($_SESSION['cart']);
+$cart_empty = empty($cart_items);
 
 // Tính tổng tiền và áp dụng khuyến mãi
 $total = 0;
 $discount = 0;
 if (!$cart_empty) {
-    foreach ($_SESSION['cart'] as $maLaptop => $item) {
+    foreach ($cart_items as $maLaptop => $item) {
         $item_total = $item['price'] * $item['quantity'];
         $query_lkm = "SELECT km.MaKhuyenMai, km.PhanTramGiam, km.GiamToiDa 
                       FROM LaptopKhuyenMai lkm 
@@ -153,7 +148,7 @@ if (!$cart_empty) {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($_SESSION['cart'] as $maLaptop => $item): ?>
+                            <?php foreach ($cart_items as $maLaptop => $item): ?>
                                 <?php
                                 $item_discount = 0;
                                 $query_lkm = "SELECT km.PhanTramGiam, km.GiamToiDa, km.DieuKien 
@@ -184,11 +179,11 @@ if (!$cart_empty) {
                                     <td><?php echo $item_discount ? formatPrice($item_discount) : '-'; ?></td>
                                     <td class="quantity">
                                         <input type="number" name="quantity[<?php echo $maLaptop; ?>]" 
-                                               value="<?php echo $item['quantity']; ?>" min="1" max="100">
+                                               value="<?php echo $item['quantity']; ?>" min="1" max="<?php echo $item['stock']; ?>">
                                     </td>
                                     <td><?php echo formatPrice($item['price'] * $item['quantity'] - $item_discount); ?></td>
                                     <td class="remove">
-                                        <a href="cart.php?remove=<?php echo $maLaptop; ?>" 
+                                        <a href="Cart.php?remove=<?php echo $maLaptop; ?>" 
                                            class="remove-btn" onclick="return confirm('Xóa sản phẩm này?')">Xóa</a>
                                     </td>
                                 </tr>

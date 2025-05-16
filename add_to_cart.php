@@ -1,4 +1,5 @@
 <?php
+session_start();
 header('Content-Type: application/json');
 
 $response = ['success' => false, 'message' => ''];
@@ -13,6 +14,7 @@ try {
     }
 
     $maLaptop = intval($_POST['maLaptop']);
+    $quantity = isset($_POST['quantity']) && is_numeric($_POST['quantity']) ? max(1, intval($_POST['quantity'])) : 1;
     $maNguoiDung = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 
     // Kiểm tra tồn tại sản phẩm
@@ -29,6 +31,13 @@ try {
     $laptop = $result->fetch_assoc();
     $stmt->close();
 
+    // Kiểm tra số lượng tồn kho
+    if ($quantity > $laptop['SoLuong']) {
+        $response['message'] = 'Số lượng vượt quá tồn kho';
+        echo json_encode($response);
+        exit;
+    }
+
     // Thêm vào giỏ hàng
     if ($maNguoiDung) {
         // Kiểm tra xem sản phẩm đã có trong giỏ hàng chưa
@@ -39,17 +48,17 @@ try {
         $stmt->close();
 
         if ($existing) {
-            $newQuantity = $existing['SoLuong'] + 1;
+            $newQuantity = $existing['SoLuong'] + $quantity;
             if ($newQuantity > $laptop['SoLuong']) {
                 $response['message'] = 'Số lượng vượt quá tồn kho';
                 echo json_encode($response);
                 exit;
             }
-            $stmt = $conn->prepare("UPDATE GioHang SET SoLuong = SoLuong + 1 WHERE MaNguoiDung = ? AND MaLaptop = ?");
-            $stmt->bind_param('ii', $maNguoiDung, $maLaptop);
+            $stmt = $conn->prepare("UPDATE GioHang SET SoLuong = ? WHERE MaNguoiDung = ? AND MaLaptop = ?");
+            $stmt->bind_param('iii', $newQuantity, $maNguoiDung, $maLaptop);
         } else {
-            $stmt = $conn->prepare("INSERT INTO GioHang (MaNguoiDung, MaLaptop, SoLuong) VALUES (?, ?, 1)");
-            $stmt->bind_param('ii', $maNguoiDung, $maLaptop);
+            $stmt = $conn->prepare("INSERT INTO GioHang (MaNguoiDung, MaLaptop, SoLuong) VALUES (?, ?, ?)");
+            $stmt->bind_param('iii', $maNguoiDung, $maLaptop, $quantity);
         }
         $stmt->execute();
         $stmt->close();
@@ -59,12 +68,12 @@ try {
             $_SESSION['cart'] = [];
         }
         if (isset($_SESSION['cart'][$maLaptop])) {
-            $_SESSION['cart'][$maLaptop]['quantity'] += 1;
+            $_SESSION['cart'][$maLaptop]['quantity'] += $quantity;
         } else {
             $_SESSION['cart'][$maLaptop] = [
                 'name' => '',
                 'price' => $laptop['GiaBan'],
-                'quantity' => 1,
+                'quantity' => $quantity,
                 'image' => 'assets/images/default.png'
             ];
         }

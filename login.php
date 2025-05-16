@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = $stmt->get_result();
             $user = $result->fetch_assoc();
 
-            if ($user && password_verify($matKhau, $user['MatKhau'])) {
+            if ($user && $matKhau === $user['MatKhau']) {
                 $_SESSION['user_id'] = $user['MaNguoiDung'];
                 header('Location: index.php');
                 exit;

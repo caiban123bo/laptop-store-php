@@ -5,7 +5,7 @@ include 'assets/db.php';
 // Lấy MaLaptop từ URL
 $maLaptop = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-// Truy vấn thông tin laptop
+// Truy vấn thông tin laptop và tất cả hình ảnh
 $query = "
     SELECT l.MaLaptop, l.TenLaptop, l.GiaBan, l.MoTa, l.SoLuong, h.TenHang, d.TenDanhMuc,
            t.TenCPU, t.Dong, t.TheHe, t.KienTruc, t.RAM, t.OCung, t.CardDoHoa, t.ManHinh, t.HeDieuHanh,
@@ -23,35 +23,16 @@ $stmt->execute();
 $result = $stmt->get_result();
 $laptop = $result->fetch_assoc();
 
+// Lấy tất cả hình ảnh của sản phẩm
+$imageQuery = "SELECT DuongDan FROM HinhAnh WHERE MaLaptop = ? ORDER BY MacDinh DESC, DuongDan";
+$imageStmt = $conn->prepare($imageQuery);
+$imageStmt->bind_param('i', $maLaptop);
+$imageStmt->execute();
+$images = $imageStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
 // Hàm định dạng giá
 function formatPrice($price) {
     return number_format($price, 0, ',', '.') . 'đ';
-}
-
-// Xử lý thêm vào giỏ hàng
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
-    $quantity = isset($_POST['quantity']) ? max(1, intval($_POST['quantity'])) : 1;
-    
-    if ($laptop && $quantity <= $laptop['SoLuong']) {
-        if (!isset($_SESSION['cart'])) {
-            $_SESSION['cart'] = [];
-        }
-        
-        if (isset($_SESSION['cart'][$maLaptop])) {
-            $_SESSION['cart'][$maLaptop]['quantity'] += $quantity;
-        } else {
-            $_SESSION['cart'][$maLaptop] = [
-                'name' => $laptop['TenHang'] . ' ' . $laptop['TenLaptop'],
-                'price' => $laptop['GiaBan'],
-                'quantity' => $quantity,
-                'image' => $laptop['HinhAnh'] ?: 'assets/images/default.png'
-            ];
-        }
-        
-        echo '<div class="success-message">Đã thêm sản phẩm vào giỏ hàng!</div>';
-    } else {
-        echo '<div class="error-message">Sản phẩm không đủ số lượng hoặc không tồn tại!</div>';
-    }
 }
 ?>
 
@@ -63,8 +44,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
                      alt="<?php echo htmlspecialchars($laptop['TenHang'] . ' ' . $laptop['TenLaptop']); ?>" 
                      class="main-image" id="mainImage">
                 <div class="thumbnail-gallery">
-                    <img src="<?php echo htmlspecialchars($laptop['HinhAnh'] ?: 'assets/images/default.png'); ?>" 
-                         class="thumbnail" onclick="changeImage(this.src)">
+                    <?php foreach ($images as $index => $image): ?>
+                        <img src="<?php echo htmlspecialchars($image['DuongDan'] ?: 'assets/images/default.png'); ?>" 
+                             class="thumbnail" 
+                             onclick="changeImage(this.src)" 
+                             alt="Thumbnail <?php echo $index + 1; ?>">
+                    <?php endforeach; ?>
                 </div>
             </div>
             <div class="product-info">
@@ -72,12 +57,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
                 <p class="price"><?php echo formatPrice($laptop['GiaBan']); ?></p>
                 <p class="category"><strong>Danh mục:</strong> <?php echo htmlspecialchars($laptop['TenDanhMuc']); ?></p>
                 <p class="stock"><strong>Số lượng còn lại:</strong> <?php echo $laptop['SoLuong']; ?></p>
-                <form method="POST" class="add-to-cart-form">
+                <form id="add-to-cart-form" class="add-to-cart-form">
                     <div class="quantity-selector">
                         <label for="quantity">Số lượng:</label>
                         <input type="number" id="quantity" name="quantity" value="1" min="1" max="<?php echo $laptop['SoLuong']; ?>">
                     </div>
-                    <button type="submit" name="add_to_cart" class="add-to-cart-btn">Thêm vào giỏ hàng</button>
+                    <input type="hidden" name="maLaptop" value="<?php echo $laptop['MaLaptop']; ?>">
+                    <button type="submit" class="add-to-cart-btn">Thêm vào giỏ hàng</button>
                 </form>
                 <div class="product-description">
                     <h3>Mô tả sản phẩm</h3>
@@ -121,10 +107,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_to_cart'])) {
         const messages = document.querySelectorAll('.success-message, .error-message');
         messages.forEach(msg => msg.style.opacity = '0');
     }, 3000);
+
+    // Xử lý thêm vào giỏ hàng qua AJAX
+    document.getElementById('add-to-cart-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const quantity = parseInt(document.getElementById('quantity').value);
+
+        if (isNaN(quantity) || quantity < 1) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'error-message';
+            messageDiv.textContent = 'Số lượng không hợp lệ';
+            document.querySelector('.product-detail-container').prepend(messageDiv);
+            setTimeout(() => {
+                messageDiv.style.opacity = '0';
+            }, 3000);
+            return;
+        }
+
+        fetch('add_to_cart.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = data.success ? 'success-message' : 'error-message';
+            messageDiv.textContent = data.success ? 'Đã thêm ' + quantity + ' sản phẩm vào giỏ hàng!' : data.message;
+            document.querySelector('.product-detail-container').prepend(messageDiv);
+            setTimeout(() => {
+                messageDiv.style.opacity = '0';
+            }, 3000);
+        })
+        .catch(error => {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'error-message';
+            messageDiv.textContent = 'Lỗi kết nối: ' + error.message;
+            document.querySelector('.product-detail-container').prepend(messageDiv);
+            setTimeout(() => {
+                messageDiv.style.opacity = '0';
+            }, 3000);
+        });
+    });
 </script>
 
 <?php
 $stmt->close();
+$imageStmt->close();
 $conn->close();
 include 'footer.php';
 ?>

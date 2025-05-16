@@ -24,13 +24,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $macDinh = isset($_POST['mac_dinh']) ? 1 : 0;
 
     // Kiểm tra dữ liệu
-    if (empty($tenDangNhap) || empty($matKhau) || empty($email) || empty($hoTen) || empty($soDienThoai) || 
-        empty($diaChi) || empty($tinhThanh) || empty($quanHuyen) || empty($phuongXa)) {
+    if (empty($tenDangNhap) || empty($matKhau) || empty($email) || empty($hoTen) || 
+        empty($soDienThoai) || empty($diaChi) || empty($tinhThanh) || 
+        empty($quanHuyen) || empty($phuongXa)) {
         $error = 'Vui lòng điền đầy đủ thông tin.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Email không hợp lệ.';
     } elseif (strlen($matKhau) < 6) {
         $error = 'Mật khẩu phải có ít nhất 6 ký tự.';
+    } elseif (!preg_match('/^[0-9]{10,11}$/', $soDienThoai)) {
+        $error = 'Số điện thoại không hợp lệ (10-11 chữ số).';
     } else {
         // Kiểm tra trùng lặp
         $stmt = $conn->prepare("SELECT MaNguoiDung FROM NguoiDung WHERE TenDangNhap = ? OR Email = ?");
@@ -43,13 +46,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
             $conn->begin_transaction();
             try {
-                // Thêm người dùng
-                $matKhauBam = password_hash($matKhau, PASSWORD_DEFAULT);
+                // Thêm người dùng (lưu mật khẩu trực tiếp, không mã hóa)
                 $stmt = $conn->prepare("
                     INSERT INTO NguoiDung (TenDangNhap, MatKhau, Email, HoTen, SoDienThoai, VaiTro, TrangThai)
                     VALUES (?, ?, ?, ?, ?, 'KhachHang', TRUE)
                 ");
-                $stmt->bind_param('sssss', $tenDangNhap, $matKhauBam, $email, $hoTen, $soDienThoai);
+                $stmt->bind_param('sssss', $tenDangNhap, $matKhau, $email, $hoTen, $soDienThoai);
                 $stmt->execute();
                 $maNguoiDung = $conn->insert_id;
                 $stmt->close();
@@ -64,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->close();
 
                 $conn->commit();
-                $success = 'Đăng ký thành công! Vui lòng đăng nhập.';
+                $success = 'Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.';
             } catch (Exception $e) {
                 $conn->rollback();
                 $error = 'Lỗi khi đăng ký: ' . htmlspecialchars($e->getMessage());

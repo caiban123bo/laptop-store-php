@@ -10,10 +10,10 @@ session_start();
     <!-- Header -->
     <header>
         <div class="logo">SALE LED</div>
-        <div class="search-bar">
-            <input type="text" placeholder="Nhập từ khóa...">
-            <button>Tìm kiếm</button>
-        </div>
+        <form action="search.php" method="GET" class="search-bar">
+            <input type="text" name="keyword" placeholder="Nhập từ khóa..." required>
+            <button type="submit">Tìm kiếm</button>
+        </form>
         <div class="user-actions">
             <a href="Cart.php">Giỏ hàng</a>
             <span>Yêu thích</span>
@@ -28,9 +28,11 @@ session_start();
     <nav class="nav-menu">
         <ul>
             <li><a href="index.php">Trang chủ</a></li>
-            <li><a href="#">Lịch sử đơn hàng</a></li>
+            <li><a href="OrderHistory.php">Lịch sử đơn hàng</a></li>
             <li><a href="#">Giới thiệu về nhóm</a></li>
-            <li><a href="#">Sự kiện khuyến mãi</a></li>
-            <li><a href="#">Trang cá nhân</a></li>
+            <li><a href="KhuyenMaiHienTai.php">Sự kiện khuyến mãi</a></li>
+            <li><a href="TrangCaNhan.php">Trang cá nhân</a></li>
         </ul>
     </nav>
+</body>
+</html>
