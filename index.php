@@ -6,7 +6,7 @@ include 'assets/db.php';
 $success_message = '';
 if (isset($_SESSION['order_success'])) {
     $success_message = $_SESSION['order_success'];
-    unset($_SESSION['order_success']); // Xóa thông báo sau khi hiển thị
+    unset($_SESSION['order_success']);
 }
 if ($success_message): ?>
     <div class="success-message"><?php echo htmlspecialchars($success_message); ?></div>
@@ -15,7 +15,7 @@ if ($success_message): ?>
     setTimeout(() => {
         const messages = document.querySelectorAll('.success-message, .error-message');
         messages.forEach(msg => msg.style.opacity = '0');
-    }, 5000); // Ẩn thông báo sau 5 giây
+    }, 5000);
 
     // Hàm thêm sản phẩm vào giỏ hàng
     function addToCart(maLaptop) {
@@ -30,7 +30,6 @@ if ($success_message): ?>
         .then(data => {
             if (data.success) {
                 alert('Thêm vào giỏ hàng thành công!');
-                // Cập nhật số lượng giỏ hàng (nếu có hiển thị)
             } else {
                 alert('Lỗi: ' + (data.message || 'Không thể thêm vào giỏ hàng'));
             }
@@ -38,11 +37,6 @@ if ($success_message): ?>
         .catch(error => {
             alert('Lỗi kết nối: ' + error.message);
         });
-    }
-
-    // Hàm thêm vào danh sách yêu thích (chưa hoàn thiện, cần logic backend)
-    function addToFavorite(maLaptop) {
-        alert('Chức năng yêu thích chưa được triển khai. MaLaptop: ' + maLaptop);
     }
 </script>
 <?php
@@ -186,24 +180,144 @@ function formatPrice($price)
     <?php include 'sidebar.php'; ?>
     <main class="product-grid">
         <?php if ($laptops->num_rows === 0): ?>
-            <p>No products available.</p>
+            <p>Không có sản phẩm nào.</p>
         <?php else: ?>
             <?php while ($laptop = $laptops->fetch_assoc()): ?>
                 <div class="product-card">
-                    <img src="<?php echo htmlspecialchars($laptop['HinhAnh'] ?: 'assets/images/default.png'); ?>"
-                        alt="<?php echo htmlspecialchars($laptop['TenHang'] . ' ' . $laptop['TenLaptop']); ?>">
-                    <h4><?php echo htmlspecialchars($laptop['TenHang'] . ' ' . $laptop['TenLaptop']); ?></h4>
+                    <div class="product-image">
+                        <img src="<?php echo htmlspecialchars($laptop['HinhAnh'] ?: 'assets/images/default.png'); ?>"
+                            alt="<?php echo htmlspecialchars($laptop['TenHang'] . ' ' . $laptop['TenLaptop']); ?>">
+                    </div>
+                    <h4 class="product-title"><?php echo htmlspecialchars($laptop['TenHang'] . ' ' . $laptop['TenLaptop']); ?></h4>
                     <p class="price"><?php echo formatPrice($laptop['GiaBan']); ?></p>
                     <div class="actions">
-                        <button class="add-to-cart" onclick="addToCart(<?php echo $laptop['MaLaptop']; ?>)">Thêm vào giỏ hàng</button>
-                        <a href="product_detail.php?id=<?php echo $laptop['MaLaptop']; ?>" class="view-detail">Xem chi tiết</a>
-                        <button class="favorite" onclick="addToFavorite(<?php echo $laptop['MaLaptop']; ?>)">Yêu thích</button>
+                        <button class="add-to-cart" onclick="addToCart(<?php echo $laptop['MaLaptop']; ?>)">
+                            <i class="fas fa-cart-plus"></i> Thêm vào giỏ
+                        </button>
+                        <a href="product_detail.php?id=<?php echo $laptop['MaLaptop']; ?>" class="view-detail">
+                            <i class="fas fa-eye"></i> Xem chi tiết
+                        </a>
                     </div>
                 </div>
             <?php endwhile; ?>
         <?php endif; ?>
     </main>
 </div>
+
+<style>
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+    padding: 20px;
+}
+
+.product-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    width: 250px;
+    min-height: 380px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+    height: 300px
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+}
+
+.product-image {
+    height: 180px;
+    overflow: hidden;
+}
+
+.product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 5px;
+}
+
+.product-title {
+    font-size: 1.1em;
+    margin: 10px 0;
+    height: 50px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.price {
+    color: #e44d26;
+    font-weight: bold;
+    margin: 5px 0;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
+
+.add-to-cart, .view-detail {
+    flex: 1;
+    padding: 8px;
+    border-radius: 5px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: background 0.2s;
+    text-align: center;
+    text-decoration: none;
+    min-width: 100px;
+}
+
+.add-to-cart {
+    background: #28a745;
+    color: #fff;
+    border: none;
+}
+
+.add-to-cart:hover {
+    background: #218838;
+}
+
+.view-detail {
+    background: #007bff;
+    color: #fff;
+    border: none;
+}
+
+.view-detail:hover {
+    background: #0056b3;
+}
+
+.success-message, .error-message {
+    background: #d4edda;
+    color: #155724;
+    padding: 10px;
+    margin: 10px auto;
+    border: 1px solid #c3e6cb;
+    border-radius: 5px;
+    max-width: 600px;
+    opacity: 1;
+    transition: opacity 1s ease-out;
+}
+
+.error-message {
+    background: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+}
+</style>
 
 <?php
 $laptops->free();

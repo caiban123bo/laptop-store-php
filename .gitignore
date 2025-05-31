@@ -13,3 +13,5 @@ Ignore IDE or editor configs
 Ignore database dumps (if any)
 
 *.sql
+
+assets\mail_information.php

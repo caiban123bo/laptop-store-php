@@ -5,6 +5,17 @@ include 'assets/db.php';
 // Lấy MaLaptop từ URL
 $maLaptop = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
+// Kiểm tra trạng thái yêu thích
+$maNguoiDung = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
+$isFavorite = false;
+if ($maNguoiDung) {
+    $stmt = $conn->prepare("SELECT MaYeuThich FROM YeuThich WHERE MaNguoiDung = ? AND MaLaptop = ?");
+    $stmt->bind_param('ii', $maNguoiDung, $maLaptop);
+    $stmt->execute();
+    $isFavorite = $stmt->get_result()->num_rows > 0;
+    $stmt->close();
+}
+
 // Truy vấn thông tin laptop và tất cả hình ảnh
 $query = "
     SELECT l.MaLaptop, l.TenLaptop, l.GiaBan, l.MoTa, l.SoLuong, h.TenHang, d.TenDanhMuc,
@@ -54,7 +65,14 @@ function formatPrice($price) {
             </div>
             <div class="product-info">
                 <h1><?php echo htmlspecialchars($laptop['TenHang'] . ' ' . $laptop['TenLaptop']); ?></h1>
-                <p class="price"><?php echo formatPrice($laptop['GiaBan']); ?></p>
+                <div class="price-container">
+                    <p class="price"><?php echo formatPrice($laptop['GiaBan']); ?></p>
+                    <?php if ($maNguoiDung): ?>
+                        <button class="favorite-btn" onclick="toggleFavorite(<?php echo $laptop['MaLaptop']; ?>, this)">
+                            <?php echo $isFavorite ? 'Bỏ yêu thích' : 'Yêu thích'; ?>
+                        </button>
+                    <?php endif; ?>
+                </div>
                 <p class="category"><strong>Danh mục:</strong> <?php echo htmlspecialchars($laptop['TenDanhMuc']); ?></p>
                 <p class="stock"><strong>Số lượng còn lại:</strong> <?php echo $laptop['SoLuong']; ?></p>
                 <form id="add-to-cart-form" class="add-to-cart-form">
@@ -108,6 +126,47 @@ function formatPrice($price) {
         messages.forEach(msg => msg.style.opacity = '0');
     }, 3000);
 
+    // Hàm thêm/xóa sản phẩm yêu thích
+    function toggleFavorite(maLaptop, element) {
+        fetch('add_to_favorite.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'maLaptop=' + encodeURIComponent(maLaptop)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                element.textContent = data.isFavorite ? 'Bỏ yêu thích' : 'Yêu thích';
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'success-message';
+                messageDiv.textContent = data.message;
+                document.querySelector('.product-detail-container').prepend(messageDiv);
+                setTimeout(() => {
+                    messageDiv.style.opacity = '0';
+                }, 3000);
+            } else {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'error-message';
+                messageDiv.textContent = 'Lỗi: ' + data.message;
+                document.querySelector('.product-detail-container').prepend(messageDiv);
+                setTimeout(() => {
+                    messageDiv.style.opacity = '0';
+                }, 3000);
+            }
+        })
+        .catch(error => {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'error-message';
+            messageDiv.textContent = 'Lỗi kết nối: ' + error.message;
+            document.querySelector('.product-detail-container').prepend(messageDiv);
+            setTimeout(() => {
+                messageDiv.style.opacity = '0';
+            }, 3000);
+        });
+    }
+
     // Xử lý thêm vào giỏ hàng qua AJAX
     document.getElementById('add-to-cart-form').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -150,6 +209,174 @@ function formatPrice($price) {
         });
     });
 </script>
+
+<style>
+.product-detail-container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.product-detail {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.product-gallery {
+    flex: 1;
+    min-width: 300px;
+}
+
+.main-image {
+    width: 100%;
+    height: 400px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.thumbnail-gallery {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    overflow-x: auto;
+}
+
+.thumbnail {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.thumbnail:hover {
+    border-color: #007bff;
+}
+
+.product-info {
+    flex: 1;
+    min-width: 300px;
+}
+
+.product-info h1 {
+    font-size: 1.8em;
+    margin-bottom: 10px;
+}
+
+.price-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.price {
+    font-size: 1.5em;
+    color: #e44d26;
+    font-weight: bold;
+    margin: 0;
+}
+
+.favorite-btn {
+    background: #ff69b4;
+    color: #fff;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.2s;
+}
+
+.favorite-btn:hover {
+    background: #ff1493;
+}
+
+.category, .stock {
+    margin: 5px 0;
+}
+
+.add-to-cart-form {
+    margin: 20px 0;
+}
+
+.quantity-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.quantity-selector input {
+    width: 60px;
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.add-to-cart-btn {
+    background: #28a745;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+}
+
+.add-to-cart-btn:hover {
+    background: #218838;
+}
+
+.product-description {
+    margin-top: 20px;
+}
+
+.product-specs {
+    margin-top: 20px;
+}
+
+.specs-frame {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.specs-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.specs-table th, .specs-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.specs-table th {
+    width: 30%;
+    background:rgb(0, 106, 213);
+}
+
+.success-message, .error-message {
+    background: #d4edda;
+    color: #155724;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #c3e6cb;
+    border-radius: 5px;
+    opacity: 1;
+    transition: opacity 1s ease-out;
+}
+
+.error-message {
+    background: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+}
+</style>
 
 <?php
 $stmt->close();
