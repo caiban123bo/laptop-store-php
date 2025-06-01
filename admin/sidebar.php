@@ -2,7 +2,7 @@
 require_once '..\assets\db.php';
 function loadSidebar() {
     echo '<nav class="sidebar">
-            <h2>Menu</h2>
+            <h2><a href="../index.php" style="text-decoration:none;color:white">Menu</a></h2>
             <ul>
                 <li><a href="index.php">Sản phẩm</a></li>
                 <li><a href="order_details.php">Lịch sử đặt hàng</a></li>
