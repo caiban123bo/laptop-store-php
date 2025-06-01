@@ -138,32 +138,57 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     if ($action === 'add') {
-        $stmt = $pdo->prepare("INSERT INTO Laptop (TenLaptop, GiaBan, SoLuong, MaDanhMuc, MoTa, MaHang, MaThongSo) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$_POST['name'], $_POST['price'], $_POST['stock'], $_POST['category'], $_POST['description'], $_POST['brand'], $_POST['specs']]);
-        $maLaptop = $pdo->lastInsertId();
-        $stmt = $pdo->prepare("INSERT INTO HinhAnh (MaLaptop, DuongDan, MacDinh) VALUES (?, ?, TRUE)");
-        $stmt->execute([$maLaptop, $_POST['image']]);
+        if (empty($_POST['name']) || !is_numeric($_POST['price']) || !is_numeric($_POST['stock'])) {
+            header("Location: index.php?error=Invalid input for adding product");
+            exit;
+        }
+        try {
+            $stmt = $pdo->prepare("INSERT INTO Laptop (TenLaptop, GiaBan, SoLuong, MaDanhMuc, MoTa, MaHang, MaThongSo) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$_POST['name'], $_POST['price'], $_POST['stock'], $_POST['category'], $_POST['description'], $_POST['brand'], $_POST['specs']]);
+            $maLaptop = $pdo->lastInsertId();
+            $stmt = $pdo->prepare("INSERT INTO HinhAnh (MaLaptop, DuongDan, MacDinh) VALUES (?, ?, TRUE)");
+            $stmt->execute([$maLaptop, $_POST['image']]);
+            header("Location: index.php?success=Product added");
+        } catch (PDOException $e) {
+            header("Location: index.php?error=Database error: Unable to add product");
+        }
     } elseif ($action === 'update') {
-        $stmt = $pdo->prepare("UPDATE Laptop SET TenLaptop=?, GiaBan=?, SoLuong=?, MaDanhMuc=?, MoTa=?, MaHang=?, MaThongSo=? WHERE MaLaptop=?");
-        $stmt->execute([$_POST['name'], $_POST['price'], $_POST['stock'], $_POST['category'], $_POST['description'], $_POST['brand'], $_POST['specs'], $_POST['id']]);
-        $stmt = $pdo->prepare("UPDATE HinhAnh SET DuongDan=? WHERE MaLaptop=? AND MacDinh=TRUE");
-        $stmt->execute([$_POST['image'], $_POST['id']]);
+        if (empty($_POST['id']) || empty($_POST['name']) || !is_numeric($_POST['price']) || !is_numeric($_POST['stock'])) {
+            header("Location: index.php?error=Invalid input for updating product");
+            exit;
+        }
+        try {
+            $stmt = $pdo->prepare("UPDATE Laptop SET TenLaptop=?, GiaBan=?, SoLuong=?, MaDanhMuc=?, MoTa=?, MaHang=?, MaThongSo=? WHERE MaLaptop=?");
+            $stmt->execute([$_POST['name'], $_POST['price'], $_POST['stock'], $_POST['category'], $_POST['description'], $_POST['brand'], $_POST['specs'], $_POST['id']]);
+            $stmt = $pdo->prepare("UPDATE HinhAnh SET DuongDan=? WHERE MaLaptop=? AND MacDinh=TRUE");
+            $stmt->execute([$_POST['image'], $_POST['id']]);
+            header("Location: index.php?success=Product updated");
+        } catch (PDOException $e) {
+            header("Location: index.php?error=Database error: Unable to update product");
+        }
     }
-    header("Location: index.php");
     exit;
 }
 
 if (isset($_GET['sell_id'])) {
     $id = $_GET['sell_id'];
-    $pdo->exec("UPDATE Laptop SET SoLuong = SoLuong - 1 WHERE MaLaptop = $id AND SoLuong > 0");
-    header("Location: index.php");
+    try {
+        $pdo->exec("UPDATE Laptop SET SoLuong = SoLuong - 1 WHERE MaLaptop = $id AND SoLuong > 0");
+        header("Location: index.php?success=Product sold");
+    } catch (PDOException $e) {
+        header("Location: index.php?error=Database error: Unable to sell product");
+    }
     exit;
 }
 
 if (isset($_GET['remove_id'])) {
     $id = $_GET['remove_id'];
-    $pdo->exec("DELETE FROM Laptop WHERE MaLaptop = $id");
-    header("Location: index.php");
+    try {
+        $pdo->exec("DELETE FROM Laptop WHERE MaLaptop = $id");
+        header("Location: index.php?success=Product removed");
+    } catch (PDOException $e) {
+        header("Location: index.php?error=Database error: Unable to remove product");
+    }
     exit;
 }
 
@@ -192,6 +217,12 @@ function findProductById($id, $products) {
                 <button id="showChartBtn">View Sales Chart</button>
             </div>
             <div class="main">
+                <?php if (isset($_GET['success'])): ?>
+                    <div class="success"><?php echo htmlspecialchars($_GET['success']); ?></div>
+                <?php endif; ?>
+                <?php if (isset($_GET['error'])): ?>
+                    <div class="error"><?php echo htmlspecialchars($_GET['error']); ?></div>
+                <?php endif; ?>
                 <div class="stats">
                     <div class="card">
                         <h3>Tổng sản phẩm</h3>
@@ -212,7 +243,7 @@ function findProductById($id, $products) {
                     <input type="number" step="1000" name="max_price" placeholder="Max price" value="<?php echo $max; ?>">
                     <button class="btn btn-primary" type="submit">Filter</button>
                 </form>
-                <h2> Xuất sản phẩm đã bán </h2>
+                <h2>Xuất sản phẩm đã bán</h2>
                 <form method="get" class="inline">
                     <label>Ngày bắt đầu: <input type="date" name="start_date"></label>
                     <label>Ngày kết thúc: <input type="date" name="end_date"></label>
@@ -226,35 +257,36 @@ function findProductById($id, $products) {
                     <button type="submit" name="export" value="excel">Export to Excel</button>
                     <button type="submit" name="export" value="pdf">Export to PDF</button>
                 </form>
-                <h2>Danh sách sản phẩm </h2>
-                <form method="post">
-                    <input type="hidden" name="action" value="update">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Tên</th>
-                                <th>Giá</th>
-                                <th>Còn</th>
-                                <th>Đã bán</th>
-                                <th>Danh mục</th>
-                                <th>Hãng</th>
-                                <th>Thông số</th>
-                                <th>Mô tả</th>
-                                <th>Hình ảnh</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($paginated as $p): ?>
-                            <tr>
-                                <td><?php echo $p['id']; ?><input type="hidden" name="id" value="<?php echo $p['id']; ?>"></td>
-                                <td><input name="name" value="<?php echo htmlspecialchars($p['name']); ?>"></td>
-                                <td><input type="number" name="price" step="1000" value="<?php echo $p['price']; ?>"> VND</td>
-                                <td><input type="number" name="stock" value="<?php echo $p['stock']; ?>"></td>
+                <h2>Danh sách sản phẩm</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Tên</th>
+                            <th>Giá</th>
+                            <th>Còn</th>
+                            <th>Đã bán</th>
+                            <th>Danh mục</th>
+                            <th>Hãng</th>
+                            <th>Thông số</th>
+                            <th>Mô tả</th>
+                            <th>Hình ảnh</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($paginated as $p): ?>
+                        <tr>
+                            <form method="post">
+                                <input type="hidden" name="action" value="update">
+                                <input type="hidden" name="id" value="<?php echo $p['id']; ?>">
+                                <td><?php echo $p['id']; ?></td>
+                                <td><input name="name" value="<?php echo htmlspecialchars($p['name']); ?>" required></td>
+                                <td><input type="number" name="price" step="1000" value="<?php echo $p['price']; ?>" required> VND</td>
+                                <td><input type="number" name="stock" value="<?php echo $p['stock']; ?>" required></td>
                                 <td><?php echo $p['sold']; ?></td>
                                 <td>
-                                    <select name="category">
+                                    <select name="category" required>
                                         <?php foreach ($categories as $id => $catName): ?>
                                         <option value="<?php echo $id; ?>" <?php echo ($p['category_id'] == $id) ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($catName); ?>
@@ -263,7 +295,7 @@ function findProductById($id, $products) {
                                     </select>
                                 </td>
                                 <td>
-                                    <select name="brand">
+                                    <select name="brand" required>
                                         <?php foreach ($brands as $id => $brandName): ?>
                                         <option value="<?php echo $id; ?>" <?php echo ($p['brand_id'] == $id) ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($brandName); ?>
@@ -272,40 +304,39 @@ function findProductById($id, $products) {
                                     </select>
                                 </td>
                                 <td>
-                                    <select name="specs">
+                                    <select name="specs" required>
                                         <?php foreach ($specs as $spec): ?>
                                         <option value="<?php echo $spec['MaThongSo']; ?>"
                                             <?php echo ($p['spec_id'] == $spec['MaThongSo']) ? 'selected' : ''; ?>>
                                             <?php 
-                                                $specDisplay =  "" . htmlspecialchars($spec['TenCPU']) . 
-                                                                ", " . htmlspecialchars($spec['CardDoHoa']) . 
-                                                                ", " . htmlspecialchars($spec['ManHinh']) . 
-                                                                ", " . htmlspecialchars($spec['RAM']) . 
-                                                                "|" . htmlspecialchars($spec['OCung']) . 
-                                                                ", Pin: " . htmlspecialchars($spec['Pin']) . 
-                                                                ", " . htmlspecialchars($spec['KhoiLuong']);
+                                                $specDisplay = htmlspecialchars($spec['TenCPU']) . 
+                                                               ", " . htmlspecialchars($spec['CardDoHoa']) . 
+                                                               ", " . htmlspecialchars($spec['ManHinh']) . 
+                                                               ", " . htmlspecialchars($spec['RAM']) . 
+                                                               "|" . htmlspecialchars($spec['OCung']) . 
+                                                               ", Pin: " . htmlspecialchars($spec['Pin']) . 
+                                                               ", " . htmlspecialchars($spec['KhoiLuong']);
                                                 echo $specDisplay;
                                             ?>
                                         </option>
                                         <?php endforeach; ?>
                                     </select>
                                 </td>
-                                <td><textarea name="description" onclick="this.rows=5;" onblur="this.rows=1;" rows="1">
-                                    <?php echo htmlspecialchars($p['description']); ?></textarea></td>
+                                <td><textarea name="description" onclick="this.rows=5;" onblur="this.rows=1;" rows="1"><?php echo htmlspecialchars($p['description']); ?></textarea></td>
                                 <td><input type="text" name="image" value="<?php echo htmlspecialchars($p['image']); ?>"></td>
                                 <td>
                                     <button class="btn btn-primary" type="submit">Apply Edit</button>
                                     <a class="btn btn-primary" href="?sell_id=<?php echo $p['id']; ?>">Sell</a>
                                     <a class="btn btn-primary" href="?remove_id=<?php echo $p['id']; ?>">Remove</a>
                                 </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </form>
+                            </form>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
                 <div class="page-nav">
                     <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                    <a href="?page=<?php echo $i; ?>" class="<?php echo $i == $page ? 'active' : ''; ?>"><?php echo $i; ?></a>
+                    <a href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&min_price=<?php echo $min; ?>&max_price=<?php echo $max; ?>" class="<?php echo $i == $page ? 'active' : ''; ?>"><?php echo $i; ?></a>
                     <?php endfor; ?>
                 </div>
                 <h2>Thêm sản phẩm</h2>
@@ -314,22 +345,21 @@ function findProductById($id, $products) {
                     <input name="name" placeholder="Name" required>
                     <input type="number" step="1000" name="price" placeholder="Price (VND)" required>
                     <input type="number" name="stock" placeholder="Stock" required>
-                    <select name="category">
+                    <select name="category" required>
                         <?php foreach ($categories as $id => $catName): ?>
                         <option value="<?php echo $id; ?>"><?php echo htmlspecialchars($catName); ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <select name="brand">
+                    <select name="brand" required>
                         <?php foreach ($brands as $id => $brandName): ?>
                         <option value="<?php echo $id; ?>"><?php echo htmlspecialchars($brandName); ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <select name="specs">
+                    <select name="specs" required>
                         <?php foreach ($specs as $spec): ?>
                         <option value="<?php echo $spec['MaThongSo']; ?>">
                             <?php 
-                                $specDisplay = "" . htmlspecialchars($spec['MaThongSo']) .
-                                               ", " . htmlspecialchars($spec['TenCPU']) . 
+                                $specDisplay = htmlspecialchars($spec['TenCPU']) . 
                                                ", " . htmlspecialchars($spec['CardDoHoa']) . 
                                                ", " . htmlspecialchars($spec['ManHinh']) . 
                                                ", " . htmlspecialchars($spec['RAM']) . 
@@ -365,11 +395,19 @@ function findProductById($id, $products) {
                     labels: <?php echo json_encode(array_column($products, 'name')); ?>,
                     datasets: [{
                         label: 'Units Sold',
-                        data: <?php echo json_encode(array_column($products, 'sold')); ?>
+                        data: <?php echo json_encode(array_column($products, 'sold')); ?>,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
                     }]
                 },
                 options: {
-                    maintainAspectRatio: false
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
                 }
             });
             </script>

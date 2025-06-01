@@ -1,3 +1,4 @@
+
 <?php
 require_once '..\assets\db.php';
 function loadSidebar() {

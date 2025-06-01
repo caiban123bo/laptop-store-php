@@ -45,16 +45,18 @@ if ($maNguoiDung && empty($_SESSION['cart'])) {
 
 // Lấy danh sách khuyến mãi
 $khuyenMai = [];
-$query_km = "SELECT MaKhuyenMai, TenChuongTrinh, PhanTramGiam, GiamToiDa, DieuKien 
-             FROM KhuyenMai 
-             WHERE TrangThai = TRUE AND NgayBatDau <= CURDATE() AND NgayKetThuc >= CURDATE() 
-             AND SoLuong > 0 
-             ORDER BY PhanTramGiam DESC, GiamToiDa DESC";
+$query_km = "SELECT MaKhuyenMai, TenChuongTrinh, PhanTramGiam, GiamToiDa, COALESCE(DieuKien, 0) AS DieuKien
+            FROM KhuyenMai 
+            WHERE TrangThai = TRUE 
+            AND (NgayBatDau <= CURDATE() OR NgayBatDau IS NULL)
+            AND (NgayKetThuc >= CURDATE() OR NgayKetThuc IS NULL)
+            AND (SoLuong > 0 OR SoLuong IS NULL)
+            ORDER BY PhanTramGiam DESC, GiamToiDa DESC";
 $result_km = $conn->query($query_km);
 while ($row = $result_km->fetch_assoc()) {
     $khuyenMai[] = $row;
 }
-
+error_log(print_r($khuyenMai, true));
 // Lấy danh sách phương thức thanh toán
 $phuongThuc = [];
 $stmt = $conn->prepare("SELECT MaPhuongThuc, TenPhuongThuc FROM PhuongThucThanhToan WHERE TrangThai = TRUE");
@@ -111,16 +113,31 @@ if (!$cart_empty) {
         $total += $item_total;
         $stmt->close();
     }
-    // Tự động chọn khuyến mãi tốt nhất
-    foreach ($khuyenMai as $km) {
-        if ($total >= ($km['DieuKien'] ?? 0)) {
-            $promo_discount = min(
-                $total * $km['PhanTramGiam'] / 100,
-                $km['GiamToiDa']
-            );
-            if (!$selected_promo || $promo_discount > $discount) {
+    // Kiểm tra khuyến mãi được chọn từ form
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['promo_code']) && !empty($_POST['promo_code'])) {
+        foreach ($khuyenMai as $km) {
+            if ($km['MaKhuyenMai'] == $_POST['promo_code'] && $total >= ($km['DieuKien'] ?? 0)) {
                 $selected_promo = $km;
-                $discount += $promo_discount;
+                $promo_discount = min(
+                    $total * $km['PhanTramGiam'] / 100,
+                    $km['GiamToiDa']
+                );
+                $discount = max($discount, $promo_discount); // Chọn khuyến mãi tốt nhất
+                break;
+            }
+        }
+    } else {
+        // Tự động chọn khuyến mãi tốt nhất nếu không có promo_code
+        foreach ($khuyenMai as $km) {
+            if ($total >= ($km['DieuKien'] ?? 0)) {
+                $promo_discount = min(
+                    $total * $km['PhanTramGiam'] / 100,
+                    $km['GiamToiDa']
+                );
+                if (!$selected_promo || $promo_discount > $discount) {
+                    $selected_promo = $km;
+                    $discount += $promo_discount;
+                }
             }
         }
     }
@@ -309,6 +326,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && !$c
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <div class="form-section promotion-section">
+                        <h3>Chọn khuyến mãi</h3>
+                        <select name="promo_code">
+                            <option value="">Không sử dụng khuyến mãi</option>
+                            <?php foreach ($khuyenMai as $km): ?>
+                                <option value="<?php echo $km['MaKhuyenMai']; ?>">
+                                    <?php echo htmlspecialchars($km['TenChuongTrinh']); ?> (Giảm <?php echo $km['PhanTramGiam']; ?>%, tối đa <?php echo formatPrice($km['GiamToiDa']); ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                     <div class="form-section order-summary-section">
                         <h3>Tóm tắt đơn hàng</h3>
                         <table class="order-table">
@@ -352,6 +380,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order']) && !$c
         </div>
     <?php endif; ?>
 </div>
+
+<style>
+    .promotion-section select {
+        width: 100%;
+        padding: 8px;
+        margin-top: 5px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+</style>
 
 <script>
     setTimeout(() => {

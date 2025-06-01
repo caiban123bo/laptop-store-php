@@ -21,10 +21,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
     } elseif ($action === 'add_event') {
         $stmt = $pdo->prepare(
-            "INSERT INTO KhuyenMai (TenChuongTrinh, MoTa, PhanTramGiam, NgayBatDau, NgayKetThuc, TrangThai) VALUES (?, ?, ?, ?, ?, TRUE)"
+            "INSERT INTO KhuyenMai (TenChuongTrinh, MoTa, PhanTramGiam, GiamToiDa, NgayBatDau, NgayKetThuc, TrangThai) VALUES (?, ?, ?, ?, ?, ?, TRUE)"
         );
+        // If max_discount is empty, set it to NULL; otherwise, convert to float
+        $max_discount = !empty($_POST['max_discount']) ? floatval($_POST['max_discount']) : null;
         $stmt->execute([
-            $_POST['name'], $_POST['description'], floatval($_POST['discount']), $_POST['start'], $_POST['end']
+            $_POST['name'], $_POST['description'], floatval($_POST['discount']), $max_discount, $_POST['start'], $_POST['end']
         ]);
     } elseif ($action === 'add_coupon') {
         $stmt = $pdo->prepare(
@@ -159,6 +161,7 @@ $coupons = $pdo->query(
                 <input type="date" name="end" required>
                 <input name="description" placeholder="Description">
                 <input type="number" step="0.01" name="discount" placeholder="Discount (%)" required>
+                <input type="number" step="1000" name="max_discount" placeholder="Max Discount (VND)">
                 <button class="btn btn-primary" type="submit">Add</button>
             </form>
             <h3>Thêm khuyến mãi</h3>
