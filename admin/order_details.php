@@ -57,7 +57,7 @@ if (isset($_GET['edit'])) {
         <?php loadSidebar(); ?>
         <div class="main-content">
             <div class="header">
-                <h1>Manage Order Details</h1>
+                <h1>Quản lý đơn hàng</h1>
             </div>
             <table>
                 <thead>
@@ -77,8 +77,8 @@ if (isset($_GET['edit'])) {
                         <td><?= $row['MaDonHang'] ?></td>
                         <td><?= $row['MaLaptop'] . ' - ' . htmlspecialchars($row['TenLaptop']) ?></td>
                         <td><?= $row['SoLuong'] ?></td>
-                        <td><?= $row['DonGia'] ?></td>
-                        <td>
+                        <td><?= number_format($row['DON_GIA'], 0, ',', '.') ?> VND</td>
+                            <td>
                             <a href="?edit=<?= $row['MaChiTiet'] ?>">Edit</a> |
                             <a href="?delete=<?= $row['MaChiTiet'] ?>" onclick="return confirm('Delete this entry?')">Delete</a>
                         </td>

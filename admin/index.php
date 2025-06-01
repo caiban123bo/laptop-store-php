@@ -201,6 +201,7 @@ function findProductById($id, $products) {
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -208,6 +209,7 @@ function findProductById($id, $products) {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="..\assets\admin_style.css">
 </head>
+
 <body>
     <div class="layout">
         <?php loadSidebar(); ?>
@@ -218,10 +220,10 @@ function findProductById($id, $products) {
             </div>
             <div class="main">
                 <?php if (isset($_GET['success'])): ?>
-                    <div class="success"><?php echo htmlspecialchars($_GET['success']); ?></div>
+                <div class="success"><?php echo htmlspecialchars($_GET['success']); ?></div>
                 <?php endif; ?>
                 <?php if (isset($_GET['error'])): ?>
-                    <div class="error"><?php echo htmlspecialchars($_GET['error']); ?></div>
+                <div class="error"><?php echo htmlspecialchars($_GET['error']); ?></div>
                 <?php endif; ?>
                 <div class="stats">
                     <div class="card">
@@ -238,9 +240,12 @@ function findProductById($id, $products) {
                     </div>
                 </div>
                 <form method="get" class="inline">
-                    <input type="text" name="search" placeholder="Search..." value="<?php echo htmlspecialchars($search); ?>">
-                    <input type="number" step="1000" name="min_price" placeholder="Min price" value="<?php echo $min; ?>">
-                    <input type="number" step="1000" name="max_price" placeholder="Max price" value="<?php echo $max; ?>">
+                    <input type="text" name="search" placeholder="Search..."
+                        value="<?php echo htmlspecialchars($search); ?>">
+                    <input type="number" step="1000" name="min_price" placeholder="Min price"
+                        value="<?php echo $min; ?>">
+                    <input type="number" step="1000" name="max_price" placeholder="Max price"
+                        value="<?php echo $max; ?>">
                     <button class="btn btn-primary" type="submit">Filter</button>
                 </form>
                 <h2>Xuất sản phẩm đã bán</h2>
@@ -281,14 +286,19 @@ function findProductById($id, $products) {
                                 <input type="hidden" name="action" value="update">
                                 <input type="hidden" name="id" value="<?php echo $p['id']; ?>">
                                 <td><?php echo $p['id']; ?></td>
-                                <td><input name="name" value="<?php echo htmlspecialchars($p['name']); ?>" required></td>
-                                <td><input type="number" name="price" step="1000" value="<?php echo $p['price']; ?>" required> VND</td>
+                                <td><input name="name" value="<?php echo htmlspecialchars($p['name']); ?>" required>
+                                </td>
+                                <td>
+                                    <input type="number" name="price" step="1000" value="<?php echo $p['price']; ?>">
+                                    <?php echo number_format($p['price'], 0, ',', '.'); ?> VND
+                                </td>
                                 <td><input type="number" name="stock" value="<?php echo $p['stock']; ?>" required></td>
                                 <td><?php echo $p['sold']; ?></td>
                                 <td>
                                     <select name="category" required>
                                         <?php foreach ($categories as $id => $catName): ?>
-                                        <option value="<?php echo $id; ?>" <?php echo ($p['category_id'] == $id) ? 'selected' : ''; ?>>
+                                        <option value="<?php echo $id; ?>"
+                                            <?php echo ($p['category_id'] == $id) ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($catName); ?>
                                         </option>
                                         <?php endforeach; ?>
@@ -297,7 +307,8 @@ function findProductById($id, $products) {
                                 <td>
                                     <select name="brand" required>
                                         <?php foreach ($brands as $id => $brandName): ?>
-                                        <option value="<?php echo $id; ?>" <?php echo ($p['brand_id'] == $id) ? 'selected' : ''; ?>>
+                                        <option value="<?php echo $id; ?>"
+                                            <?php echo ($p['brand_id'] == $id) ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($brandName); ?>
                                         </option>
                                         <?php endforeach; ?>
@@ -322,8 +333,10 @@ function findProductById($id, $products) {
                                         <?php endforeach; ?>
                                     </select>
                                 </td>
-                                <td><textarea name="description" onclick="this.rows=5;" onblur="this.rows=1;" rows="1"><?php echo htmlspecialchars($p['description']); ?></textarea></td>
-                                <td><input type="text" name="image" value="<?php echo htmlspecialchars($p['image']); ?>"></td>
+                                <td><textarea name="description" onclick="this.rows=5;" onblur="this.rows=1;"
+                                        rows="1"><?php echo htmlspecialchars($p['description']); ?></textarea></td>
+                                <td><input type="text" name="image"
+                                        value="<?php echo htmlspecialchars($p['image']); ?>"></td>
                                 <td>
                                     <button class="btn btn-primary" type="submit">Apply Edit</button>
                                     <a class="btn btn-primary" href="?sell_id=<?php echo $p['id']; ?>">Sell</a>
@@ -336,7 +349,8 @@ function findProductById($id, $products) {
                 </table>
                 <div class="page-nav">
                     <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                    <a href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&min_price=<?php echo $min; ?>&max_price=<?php echo $max; ?>" class="<?php echo $i == $page ? 'active' : ''; ?>"><?php echo $i; ?></a>
+                    <a href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&min_price=<?php echo $min; ?>&max_price=<?php echo $max; ?>"
+                        class="<?php echo $i == $page ? 'active' : ''; ?>"><?php echo $i; ?></a>
                     <?php endfor; ?>
                 </div>
                 <h2>Thêm sản phẩm</h2>
@@ -414,4 +428,5 @@ function findProductById($id, $products) {
         </div>
     </div>
 </body>
+
 </html>
