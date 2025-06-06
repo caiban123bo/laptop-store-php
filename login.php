@@ -26,7 +26,7 @@ function generateVerificationCode() {
 }
 
 // Function to send verification email
-function sendVerificationEmail($email, $name, $code) {
+function sendVerificationEmail($email, $name, $code, $isPasswordReset = false) {
     global $mail_username, $mail_password;
     $mail = new PHPMailer(true);
     try {
@@ -37,16 +37,19 @@ function sendVerificationEmail($email, $name, $code) {
         $mail->Password = $mail_password;
         $mail->SMTPSecure = 'tls';
         $mail->Port = 587;
-        $mail->setFrom($mail_username, 'Laptop Store Admin');
+        $mail->setFrom($mail_username, 'Laptop Store');
         $mail->addAddress($email, $name);
         $mail->isHTML(true);
-        $mail->Subject = 'Admin Verification Code';
-        $mail->Body = "
-            <p>Xin chào $name,</p>
+        $mail->Subject = $isPasswordReset ? 'Password Reset Verification Code' : 'Admin Verification Code';
+        $mail->Body = $isPasswordReset ? 
+            "<p>Xin chào $name,</p>
+            <p>Mã xác minh để đặt lại mật khẩu của bạn là: <b>$code</b></p>
+            <p>Mã này có hiệu lực trong 30 phút.</p>
+            <p>Trân trọng,<br>Laptop Store</p>" :
+            "<p>Xin chào $name,</p>
             <p>Mã xác minh của bạn để truy cập trang quản trị là: <b>$code</b></p>
             <p>Mã này có hiệu lực trong 30 phút.</p>
-            <p>Trân trọng,<br>Laptop Store</p>
-        ";
+            <p>Trân trọng,<br>Laptop Store</p>";
         $mail->send();
         return true;
     } catch (Exception $e) {
@@ -156,6 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_code'])) {
                 <input type="text" name="username" placeholder="Tên đăng nhập" required>
                 <input type="password" name="password" placeholder="Mật khẩu" required>
                 <button type="submit">Đăng nhập</button>
+                <p><a href="forgot_password.php">Quên mật khẩu?</a></p>
                 <p>Chưa có tài khoản? <a href="register.php">Đăng ký ngay</a></p>
             </form>
         <?php else: ?>

@@ -1,4 +1,79 @@
 <?php
+session_start();
+require_once '..\assets\db.php';
+
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../login.php");
+    exit;
+}
+
+// Optional: fetch VaiTro once and cache it
+if (!isset($_SESSION['vaitro'])) {
+    $stmt = $conn->prepare("SELECT VaiTro FROM NguoiDung WHERE MaNguoiDung = ?");
+    $stmt->bind_param('i', $_SESSION['user_id']);
+    $stmt->execute();
+    $stmt->bind_result($vaitro);
+    if ($stmt->fetch()) {
+        $_SESSION['vaitro'] = $vaitro;
+    }
+    $stmt->close();
+}
+
+if ($_SESSION['vaitro'] !== 'QuanTri') {
+    echo "<h3>Truy cập bị từ chối: Chỉ quản trị viên.</h3>";
+    exit;
+}
+
+// PIN gate
+if (!isset($_SESSION['admin_pin_ok']) || $_SESSION['admin_pin_ok'] !== true) {
+    $error = '';
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_pin'])) {
+        if ($_POST['admin_pin'] === '0000') {
+            $_SESSION['admin_pin_ok'] = true;
+            header("Location: index.php");
+            exit;
+        } else {
+            $error = 'Sai mã PIN.';
+        }
+    }
+
+    // Now render the PIN form (no other HTML before this!)
+    ?>
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="..\assets\admin_style.css">
+    <title>PIN Quản trị</title>
+</head>
+
+<body>
+    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: var(--bg);">
+        <form method="post" name="pin_form"
+            style="background: var(--card); padding: 2rem; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.3); max-width: 400px; width: 100%; text-align: center; color: var(--text);">
+            <h2 style="margin-top: 0; color: var(--highlight);">Xác minh mã PIN</h2>
+            <p>Vui lòng nhập mã PIN để truy cập trang quản trị:</p>
+            <input type="password" name="pin_code" placeholder="Nhập mã PIN" required
+                style="width: 100%; padding: 0.75rem; margin: 1rem 0; border-radius: 4px; border: none; background: #444; color: #fff;">
+            <button type="submit" name="verify_pin"
+                style="width: 100%; padding: 0.75rem; background: var(--highlight); color: #fff; border: none; border-radius: 4px; cursor: pointer;">
+                Xác minh
+            </button>
+        </form>
+    </div>
+
+</body>
+
+</html>
+<?php
+    exit; // stop here if PIN not validated
+}
+?>
+
+
+
+<?php
 require_once 'sidebar.php';
 require_once __DIR__ . '\..\libs\SimpleXLSXGen.php';
 require_once __DIR__ . '/../libs/tcpdf/tcpdf.php';
